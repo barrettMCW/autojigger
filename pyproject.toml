@@ -1,8 +1,5 @@
 [build-system]
-requires = [
-  "hatchling",
-  "virtualenv<21.0.0",
-  ]
+requires = ["hatchling", "virtualenv<21.0.0"]
 build-backend = "hatchling.build"
 
 [project]
@@ -13,9 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 keywords = []
-authors = [
-  { name = "daceto", email = "daceto@mcw.edu" },
-]
+authors = [{ name = "daceto", email = "daceto@mcw.edu" }]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Programming Language :: Python",
@@ -51,9 +46,7 @@ path = "src/autojigger/__about__.py"
 packages = ["src/autojigger"]
 
 [tool.hatch.env]
-requires = [
-    "hatch-pip-compile"
-]
+requires = ["hatch-pip-compile"]
 
 [tool.hatch.envs.default]
 type = "pip-compile"
@@ -64,19 +57,13 @@ dependencies = []
 build = "hatch build && chmod -R 777 dist/*"
 
 [tool.hatch.envs.test]
-dependencies = [
-  "pytest",
-  "pytest-cov",
-  "coverage[toml]>=6.2",
-]
+dependencies = ["pytest", "pytest-cov", "coverage[toml]>=6.2"]
 [tool.hatch.envs.test.scripts]
 test = "pytest {args:tests}"
 cov = "pytest --cov=src --cov-report=term-missing --cov-report=xml {args:tests}"
 
 [tool.hatch.envs.lint]
-dependencies = [
-  "ruff>=0.4.0",
-]
+dependencies = ["ruff>=0.4.0"]
 [tool.hatch.envs.lint.scripts]
 check = "ruff check src tests"
 format = "ruff format src tests"
@@ -85,9 +72,7 @@ fix = "ruff check --fix src tests"
 all = ["format", "fix", "check"]
 
 [tool.hatch.envs.types]
-dependencies = [
-  "mypy>=1.0.0",
-]
+dependencies = ["mypy>=1.0.0"]
 [tool.hatch.envs.types.scripts]
 check = "mypy --install-types --non-interactive {args:src/autojigger tests}"
 
@@ -113,20 +98,14 @@ python = ["3.9", "3.10", "3.11", "3.12", "3.13"]
 source_pkgs = ["autojigger", "tests"]
 branch = true
 parallel = true
-omit = [
-  "src/autojigger/__about__.py",
-]
+omit = ["src/autojigger/__about__.py"]
 
 [tool.coverage.paths]
 autojigger = ["src/autojigger", "*/python-template/src/autojigger"]
 tests = ["tests", "*/python-template/tests"]
 
 [tool.coverage.report]
-exclude_lines = [
-  "no cov",
-  "if __name__ == .__main__.:",
-  "if TYPE_CHECKING:",
-]
+exclude_lines = ["no cov", "if __name__ == .__main__.:", "if TYPE_CHECKING:"]
 
 [tool.ruff]
 target-version = "py39"
@@ -135,17 +114,18 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = [
-  "F",      # pyflakes
-  "E", "W", # pycodestyle
-  "I",      # isort
-  "N",      # pep8-naming
-  "UP",     # pyupgrade
-  "B",      # flake8-bugbear
-  "A",      # flake8-builtins
-  "C4",     # flake8-comprehensions
-  "DTZ",    # flake8-datetimez
-  "T20",    # flake8-print (catches stray prints in library code)
-  "RUF",    # ruff-specific rules
+  "F",   # pyflakes
+  "E",
+  "W",   # pycodestyle
+  "I",   # isort
+  "N",   # pep8-naming
+  "UP",  # pyupgrade
+  "B",   # flake8-bugbear
+  "A",   # flake8-builtins
+  "C4",  # flake8-comprehensions
+  "DTZ", # flake8-datetimez
+  "T20", # flake8-print (catches stray prints in library code)
+  "RUF", # ruff-specific rules
 ]
 ignore = []
 
@@ -165,9 +145,5 @@ addopts = ["-ra", "--strict-markers", "--strict-config"]
 xfail_strict = true
 
 [[tool.mypy.overrides]]
-module = [
-  "vtk",
-  "vtkmodules.*",
-  "pymeshfix.*",
-]
+module = ["vtk", "vtkmodules.*", "pymeshfix.*"]
 ignore_missing_imports = true

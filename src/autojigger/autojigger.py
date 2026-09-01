@@ -46,7 +46,16 @@ def load_profile(profile_path: str, profile_key: str) -> dict[str, Any]:
 
     if profile_key not in profiles:
         raise KeyError(f"Profile '{profile_key}' not found in the file.")
-    return profiles[profile_key]
+    profile = profiles[profile_key]
+    if "organ_profile" in profile or "knife_profile" in profile:
+        return {
+            **profile.get("organ_profile", {}),
+            "knife_height": 20,
+            "pre_knife_factor": 1.5,
+            "post_knife_factor": 3,
+            **profile.get("knife_profile", {}),
+        }
+    return profile
 
 
 def create_vtk_obj(obj_class, connect_port=None):
@@ -71,15 +80,10 @@ def new_surface_extractor(connect_port, label: int = 1):
 
 
 def new_smoother(connect_port, iterations: int = 10000):
-    # SmoothPolyDataFilter more effectively smooths into "rounded" mold
-    # compared to other smoothing filters but reduces size; 
-    # mold is later upscaled to revert to actual size,
-    # then further scaled for jig based on profile
-
-    #TODO want to experiment with other smoothing methods
-    # as well as subdivision surface to make rounder mold
-    smoother = create_vtk_obj(vtk.vtkSmoothPolyDataFilter, connect_port)
+    smoother = create_vtk_obj(vtk.vtkWindowedSincPolyDataFilter, connect_port)
     smoother.SetNumberOfIterations(iterations)
+    smoother.SetPassBand(0.01)
+    smoother.NormalizeCoordinatesOn()
     smoother.Update()
     return smoother
 
@@ -266,8 +270,8 @@ def get_jig_bounds(profile: dict, mold_bounds: tuple, slice_thickness: float) ->
     jig_modifiers = (
         -profile["x_wall"],
         profile["x_wall"],
-        -(profile["y_wall"] + profile["post_knife_space"]),
-        profile["y_wall"] + profile["pre_knife_space"],
+        -(profile["y_wall"] + profile["post_knife_factor"] * profile["knife_height"]),
+        profile["y_wall"] + profile["pre_knife_factor"] * profile["knife_height"],
         -(slice_thickness + profile["z_wall"]),
         (slice_thickness + profile["z_wall"]),
     )

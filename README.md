@@ -71,7 +71,13 @@ Enter custom profiles into `src/autojigger/profiles.json`, following the format 
 
 `x/y/z_wall` sizes the margins of the jig bordering the mold and cuts.
 
-`pre/post_knife_space` add further margins on the y-axis.
+Each profile has an `organ_profile` and a `knife_profile`; they are combined when the
+profile is loaded. Organ settings control extraction and mold preparation, while knife
+settings control the jig and cuts.
+
+`knife_height` is the height of the knife handle clearance in mm; it defaults to 20.
+`pre_knife_factor` and `post_knife_factor` multiply that height to add y-axis clearance
+before and after the knife, respectively. Their defaults are 1.5 and 3.
 
 `knife_width` controls the z-height of the gaps.
 
