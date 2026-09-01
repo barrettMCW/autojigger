@@ -1,0 +1,2 @@
+jig_shape_comparison.png and jig_slice_comparison.png:
+- pink jig is from autojigger, green jig was manually made and used for the same brain

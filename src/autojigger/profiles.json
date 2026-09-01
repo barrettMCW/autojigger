@@ -1,0 +1,40 @@
+{
+    "brain": {
+        "organ": "brain",
+        "x_wall": 15,
+        "y_wall": 5,
+        "z_wall": 5,
+        "pre_knife_space": 50,
+        "post_knife_space": 5,
+        "knife_width": 1.5,
+        "min_slice_thickness": 5,
+        "surface_label": 1,
+        "mold_smoothing": 6000,
+        "mold_decimation": 0.90,
+        "jig_offset": 0,
+        "jig_steps": 40,
+        "jig_smoothing": 1000,
+        "scale": 1.02,
+        "rotate_z": 90,
+        "tumor_laterality": "L"
+    },
+    "prostate": {
+        "organ": "prostate",
+        "x_wall": 5,
+        "y_wall": 3,
+        "z_wall": 3,
+        "pre_knife_space": 33.7,
+        "post_knife_space": 0,
+        "min_slice_thickness": 0,
+        "knife_width": 1.5,
+        "surface_label": 1,
+        "mold_smoothing": 10000,
+        "mold_decimation": 0.85,
+        "jig_offset": 0,
+        "jig_steps": 40,
+        "jig_smoothing": 1000,
+        "scale": 1.02,
+        "rotate_z": 0,
+        "tumor_laterality": "L"
+    }
+}
