@@ -28,6 +28,8 @@ dependencies = [
   "pyvista",
   "pyvista-manifold",
   "pyyaml",
+  "scikit-image",
+  "scipy",
   "vtk",
 ]
 
@@ -49,8 +51,8 @@ packages = ["src/autojigger"]
 requires = ["hatch-pip-compile"]
 
 [tool.hatch.envs.default]
-type = "pip-compile"
-pip-compile-hashes = true
+type = "uv"
+# pip-compile-hashes = true
 dependencies = []
 
 [tool.hatch.envs.default.scripts]

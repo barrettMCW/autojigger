@@ -12,6 +12,8 @@ import pymeshfix as mf
 import pyvista as pv
 import vtk
 import yaml
+from scipy import ndimage
+from skimage.measure import marching_cubes
 
 # Uses VTK to process NIfTI because lazy evaluation pipeline is much faster,
 # then uses PyVista to simplify jig generation and use manifold operations
@@ -72,20 +74,70 @@ def new_reader(nifti_path):
     return reader
 
 
+def new_image_resampler(connect_port, output_spacing: float):
+    resampler = create_vtk_obj(vtk.vtkImageResample, connect_port)
+    for axis in range(3):
+        resampler.SetAxisOutputSpacing(axis, output_spacing)
+    resampler.SetInterpolationModeToLinear()
+    resampler.Update()
+    return resampler
+
+
+def new_image_smoother(connect_port, standard_deviation: float = 1.0):
+    smoother = create_vtk_obj(vtk.vtkImageGaussianSmooth, connect_port)
+    smoother.SetStandardDeviation(
+        standard_deviation, standard_deviation, standard_deviation
+    )
+    smoother.Update()
+    return smoother
+
+
 def new_surface_extractor(connect_port, label: int = 1):
-    surf = create_vtk_obj(vtk.vtkDiscreteMarchingCubes, connect_port)
-    surf.SetValue(0, int(label))
+    surf = create_vtk_obj(vtk.vtkMarchingCubes, connect_port)
+    surf.SetValue(0, label - 0.5)
     surf.Update()
     return surf
 
 
-def new_smoother(connect_port, iterations: int = 10000):
+def new_surface_smoother(connect_port, iterations: int = 250):
     smoother = create_vtk_obj(vtk.vtkWindowedSincPolyDataFilter, connect_port)
     smoother.SetNumberOfIterations(iterations)
-    smoother.SetPassBand(0.01)
+    smoother.SetPassBand(0.001)
+    smoother.BoundarySmoothingOn()
+    smoother.FeatureEdgeSmoothingOff()
     smoother.NormalizeCoordinatesOn()
     smoother.Update()
     return smoother
+
+
+def new_distance_surface(
+    nifti: nib.nifti1.Nifti1Image, label: int, smoothing: float
+) -> vtk.vtkTrivialProducer:
+    spacing = nifti.header.get_zooms()[:3]
+    inside = nifti.get_fdata() == label
+    signed_distance = ndimage.distance_transform_edt(
+        ~inside, sampling=spacing
+    ) - ndimage.distance_transform_edt(inside, sampling=spacing)
+    smoothed_distance = ndimage.gaussian_filter(
+        signed_distance, sigma=np.asarray(smoothing) / np.asarray(spacing)
+    )
+    padded_distance = np.pad(
+        smoothed_distance,
+        pad_width=1,
+        mode="constant",
+        constant_values=float(smoothed_distance.max()),
+    )
+    vertices, faces, _, _ = marching_cubes(
+        padded_distance, level=0, spacing=spacing
+    )
+    vertices -= np.asarray(spacing)
+    mesh = pv.PolyData(
+        vertices,
+        np.column_stack((np.full(len(faces), 3), faces)).ravel(),
+    )
+    producer = vtk.vtkTrivialProducer()
+    producer.SetOutput(mesh)
+    return producer
 
 
 def new_decimator(connect_port, target_reduction: float = 0.97):
@@ -127,6 +179,20 @@ def new_connector(connect_port):
     connector.SetExtractionModeToLargestRegion()
     connector.Update()
     return connector
+
+
+def new_triangle_cleaner(connect_port):
+    """Ensures the mesh is pure-triangle and merges coincident points.
+
+    marching_cubes already emits an all-triangle, indexed mesh, so this is
+    mostly a cheap safety net that merges the handful of duplicate points it
+    can leave behind (does not affect the concave-crease divot artifact,
+    which is caused by FeatureEdgeSmoothing in new_surface_smoother).
+    """
+    triangulator = create_vtk_obj(vtk.vtkTriangleFilter, connect_port)
+    cleaner = create_vtk_obj(vtk.vtkCleanPolyData, triangulator.GetOutputPort())
+    cleaner.Update()
+    return cleaner
 
 
 def get_origin_translation(bounds: tuple) -> tuple:
@@ -220,16 +286,25 @@ def prep_mold(nifti_path: str, profile: dict) -> vtk.vtkPolyData:
         Finalized VTK mesh of the mold.
     """
     rotate_for_laterality(profile)
-    reader = new_reader(nifti_path)
-    surf = new_surface_extractor(reader.GetOutputPort(), profile["surface_label"])
-    smoother = new_smoother(surf.GetOutputPort(), profile["mold_smoothing"])
-    decimate = new_decimator(smoother.GetOutputPort(), profile["mold_decimation"])
-    mold_bounds = decimate.GetOutput().GetBounds()
     nifti = nib.load(nifti_path)
+    surface = new_distance_surface(
+        nifti, profile["surface_label"], profile["mold_smoothing"]
+    )
+    connector = new_connector(surface.GetOutputPort())
+    cleaner = new_triangle_cleaner(connector.GetOutputPort())
+    surface_smoother = new_surface_smoother(
+        cleaner.GetOutputPort(), profile.get("surface_smoothing", 500)
+    )
+    mold_port = surface_smoother.GetOutputPort()
+    decimate = None
+    if profile["mold_decimation"] > 0:
+        decimate = new_decimator(mold_port, profile["mold_decimation"])
+        mold_port = decimate.GetOutputPort()
+    mold_bounds = mold_port.GetProducer().GetOutput().GetBounds()
     organ_bounds = get_organ_bounds_mm(nifti)
     restoring_scale = get_restoring_scale(mold_bounds, organ_bounds)
     final_scale = tuple(profile["scale"] * np.array(restoring_scale))
-    scaler = new_scaler(decimate.GetOutputPort(), final_scale)
+    scaler = new_scaler(mold_port, final_scale)
     rotator = new_rotator(scaler.GetOutputPort(), profile["rotate_z"])
     mold_poly = rotator.GetOutput()
     mold_bounds = mold_poly.GetBounds()
@@ -272,8 +347,8 @@ def get_jig_bounds(profile: dict, mold_bounds: tuple, slice_thickness: float) ->
         profile["x_wall"],
         -(profile["y_wall"] + profile["post_knife_factor"] * profile["knife_height"]),
         profile["y_wall"] + profile["pre_knife_factor"] * profile["knife_height"],
-        -(slice_thickness + profile["z_wall"]),
-        (slice_thickness + profile["z_wall"]),
+        -(profile["z_wall"]),
+        (profile["z_wall"]),
     )
     jig_bounds = (
         mold_bounds[0] + jig_modifiers[0],
@@ -287,7 +362,7 @@ def get_jig_bounds(profile: dict, mold_bounds: tuple, slice_thickness: float) ->
 
 
 def get_clean_mesh(vtkmesh: vtk.vtkPolyData) -> pv.PolyData:
-    """Use meshfix to get and return a clean pyvista mesh, smoothing manifold errors.
+    """Return a clean mesh, repairing only surfaces with open or non-manifold edges.
 
     Args:
         vtkmesh: vtkPolyData to wrap and clean.
@@ -295,7 +370,18 @@ def get_clean_mesh(vtkmesh: vtk.vtkPolyData) -> pv.PolyData:
     Returns:
         Cleaned pyvista mesh.
     """
-    wrapped_mesh = pv.wrap(vtkmesh)
+    edge_check = vtk.vtkFeatureEdges()
+    edge_check.SetInputData(vtkmesh)
+    edge_check.BoundaryEdgesOn()
+    edge_check.NonManifoldEdgesOn()
+    edge_check.FeatureEdgesOff()
+    edge_check.ManifoldEdgesOff()
+    edge_check.Update()
+
+    wrapped_mesh = pv.wrap(vtkmesh).clean()
+    if edge_check.GetOutput().GetNumberOfLines() == 0:
+        return wrapped_mesh
+
     meshfix = mf.MeshFix(wrapped_mesh)
     meshfix.repair()
     return meshfix.mesh

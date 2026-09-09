@@ -85,9 +85,21 @@ before and after the knife, respectively. Their defaults are 1.5 and 3.
 
 `surface_label` controls the index for surface generation from the NIfTI; default is 1.
 
-`mold_smoothing` controls the number of smoothing iterations to run on the organ mold.
+`mold_smoothing` controls the Gaussian smoothing standard deviation in mm applied to a
+signed-distance representation of the binary organ mask. This reconstructs a continuous
+surface instead of preserving slice-by-slice voxel contours. The default profiles use
+`2.0`.
 
-`mold_decimation` controls the decimation, or polygon reduction, on the organ mold. The value determines the fraction of the original polygons to remove (i.e. increasing closer to 1.0 reduces more complexity).
+`surface_smoothing` controls the number of non-shrinking Windowed-Sinc smoothing
+iterations applied to the extracted mold surface. The default is `500` with a `0.0001`
+pass band.
+
+Only the largest connected mold component is retained, removing isolated segmentation
+artifacts before the mold is smoothed.
+
+`mold_decimation` controls the optional polygon reduction on the organ mold. The value
+determines the fraction of original polygons to remove; `0` disables decimation, which
+avoids long triangles that can appear as spikes in the finished mold.
 
 `jig_offset` controls the starting point on the y-axis of the mold inside the jig. Increasing this leaves more space in the back of the jig.
 
